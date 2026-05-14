@@ -1,8 +1,21 @@
 from django.conf import settings
 from django.core.management.base import BaseCommand
 
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
-from telegram.ext import Application, CallbackQueryHandler, CommandHandler, ContextTypes
+from telegram import (
+    InlineKeyboardButton,
+    InlineKeyboardMarkup,
+    ReplyKeyboardMarkup,
+    Update,
+)
+
+from telegram.ext import (
+    Application,
+    CallbackQueryHandler,
+    CommandHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from asgiref.sync import sync_to_async
 
@@ -14,23 +27,32 @@ from recipes.services import (
     get_active_recipe_by_id,
 )
 
+from bot.state import (
+    WAITING_FOR_INGREDIENTS,
+    clear_user_state,
+    get_user_state,
+    set_user_state,
+)
+
+BUTTON_ALL_RECIPES = "Все рецепты"
+BUTTON_SEARCH_BY_INGREDIENTS = "Поиск по ингредиентам"
+BUTTON_HELP = "Помощь"
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Привет! Я Culinarium — бот для поиска рецептов из домашней базы.\n\n"
-        "Команды:\n"
+        "Выбери действие на клавиатуре ниже или используй команды:\n"
         "/recipes — список рецептов\n"
         "/recipe 1 — открыть рецепт по id\n"
-        "/search куриное, картошка — поиск по ингредиентам"
+        "/search куриное, картошка — поиск по ингредиентам",
+        reply_markup=build_main_keyboard(),
     )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "Я ищу только по curated базе рецептов и не придумываю рецепты из воздуха.\n\n"
-        "Попробуй:\n"
-        "/recipes\n"
-        "/search куриное, картошка"
+        "Для работы с ботом нажмите на кнопки 'Все рецепты' или 'Поиск по ингредиентам' \n"
     )
 
 
@@ -106,6 +128,7 @@ class Command(BaseCommand):
         application.add_handler(CommandHandler("search", search))
         application.add_handler(CommandHandler("recipe", recipe))
         application.add_handler(CallbackQueryHandler(recipe_callback, pattern=r"^recipe:\d+$"))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, text_message))
 
         self.stdout.write(self.style.SUCCESS("Bot started"))
 
@@ -146,6 +169,21 @@ def get_search_recipes_list(query):
     return list(search_recipes_from_ingredient_query(query))
 
 
+@sync_to_async
+def set_user_state_async(user_id, state):
+    set_user_state(user_id, state)
+
+
+@sync_to_async
+def get_user_state_async(user_id):
+    return get_user_state(user_id)
+
+
+@sync_to_async
+def clear_user_state_async(user_id):
+    clear_user_state(user_id)
+
+
 async def recipe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
         await update.message.reply_text(
@@ -167,3 +205,53 @@ async def recipe(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(message)
 
 
+def build_main_keyboard():
+    return ReplyKeyboardMarkup(
+        [
+            [BUTTON_ALL_RECIPES, BUTTON_SEARCH_BY_INGREDIENTS],
+            [BUTTON_HELP],
+        ],
+        resize_keyboard=True,
+    )
+
+
+async def text_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    user_id = update.effective_user.id
+
+    if text == BUTTON_ALL_RECIPES:
+        await recipes(update, context)
+        return
+
+    if text == BUTTON_HELP:
+        await help_command(update, context)
+        return
+
+    if text == BUTTON_SEARCH_BY_INGREDIENTS:
+        await set_user_state_async(user_id, WAITING_FOR_INGREDIENTS)
+        await update.message.reply_text(
+            "Напиши ингредиенты через запятую.\n"
+            "Например: куриное, картошка"
+        )
+        return
+
+    state = await get_user_state_async(user_id)
+
+    if state == WAITING_FOR_INGREDIENTS:
+        await clear_user_state_async(user_id)
+
+        recipes_list = await get_search_recipes_list(text)
+
+        if not recipes_list:
+            await update.message.reply_text("Рецепты не найдены.")
+            return
+
+        await update.message.reply_text(
+            "Нашел рецепты. Выбери нужный:",
+            reply_markup=build_recipe_keyboard(recipes_list),
+        )
+        return
+
+    await update.message.reply_text(
+        "Не понял сообщение. Выбери действие на клавиатуре или используй /help."
+    )

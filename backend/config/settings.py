@@ -15,6 +15,7 @@ SECRET_KEY = env("SECRET_KEY")
 
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
 
+REDIS_URL = env("REDIS_URL", default="redis://localhost:6379/0")
 
 DEBUG = env("DEBUG")
 
