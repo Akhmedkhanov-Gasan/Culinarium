@@ -13,6 +13,9 @@ environ.Env.read_env(BASE_DIR.parent / ".env")
 
 SECRET_KEY = env("SECRET_KEY")
 
+TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN", default="")
+
+
 DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = []
@@ -29,6 +32,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
 
     "recipes.apps.RecipesConfig",
+    "bot.apps.BotConfig",
 ]
 
 MIDDLEWARE = [

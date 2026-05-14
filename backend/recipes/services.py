@@ -143,3 +143,11 @@ def format_recipe_list_for_message(recipes):
         lines.append(recipe_line)
 
     return "\n".join(lines)
+
+
+def get_active_recipe_by_id(recipe_id):
+    return (
+        get_active_recipes()
+        .filter(id=recipe_id)
+        .first()
+    )
