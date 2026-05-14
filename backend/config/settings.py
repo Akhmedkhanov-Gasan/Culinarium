@@ -1,10 +1,19 @@
 from pathlib import Path
+import environ
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = "django-insecure-vc8aa$vy_9n83-3r^!-k8d*@tjsx@=^(tej(3a@(fisz^m(1$+"
+env = environ.Env(
+    DEBUG=(bool, False),
+)
 
-DEBUG = True
+environ.Env.read_env(BASE_DIR.parent / ".env")
+
+
+SECRET_KEY = env("SECRET_KEY")
+
+DEBUG = env("DEBUG")
 
 ALLOWED_HOSTS = []
 
@@ -55,10 +64,7 @@ WSGI_APPLICATION = "config.wsgi.application"
 # Database
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
+    "default": env.db(),
 }
 
 

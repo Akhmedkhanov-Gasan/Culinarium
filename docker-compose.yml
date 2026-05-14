@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: culinarium-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: culinarium
+      POSTGRES_USER: culinarium
+      POSTGRES_PASSWORD: culinarium
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
